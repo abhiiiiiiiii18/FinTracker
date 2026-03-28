@@ -1,0 +1,4 @@
+src/components/ui/collapsible.tsx(1,28): error TS2307: Cannot find module 'expo-symbols' or its corresponding type declarations.
+src/hooks/use-theme.ts(11,17): error TS2367: This comparison appears to be unintentional because the types 'ColorSchemeName' and '"unspecified"' have no overlap.
+src/hooks/use-theme.ts(13,17): error TS2538: Type 'null' cannot be used as an index type.
+src/hooks/use-theme.ts(13,17): error TS2538: Type 'undefined' cannot be used as an index type.
