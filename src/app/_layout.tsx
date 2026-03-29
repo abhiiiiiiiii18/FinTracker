@@ -1,9 +1,11 @@
 import { Tabs, useRouter, useSegments } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Home, PlusCircle, PieChart, Users } from 'lucide-react-native';
+import * as Notifications from 'expo-notifications';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { registerForPushNotifications, storePushToken } from '../services/notificationService';
 
 const darkTheme = {
   background: '#0F172A',
@@ -21,6 +23,8 @@ export default function TabLayout() {
   const { user, initialized, initialize } = useAuthStore();
   const router = useRouter();
   const segments = useSegments();
+  const notificationListener = useRef<Notifications.EventSubscription | null>(null);
+  const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
   // Initialize auth state once on app start
   useEffect(() => {
@@ -42,10 +46,23 @@ export default function TabLayout() {
     }
   }, [user, initialized, segments]);
 
-  // Fetch user data only when logged in
+  // Fetch user data & register push notifications only when logged in
   useEffect(() => {
     if (user) {
       initFetch();
+      // Register push token and store it
+      registerForPushNotifications().then((token) => {
+        if (token) storePushToken(user.id, token);
+      });
+
+      // Handle notification taps (when app is background/closed)
+      responseListener.current = Notifications.addNotificationResponseReceivedListener(() => {
+        router.push('/splits');
+      });
+
+      return () => {
+        if (responseListener.current) responseListener.current.remove();
+      };
     }
   }, [user]);
 

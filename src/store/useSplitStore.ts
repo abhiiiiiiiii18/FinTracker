@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
+import { sendExpenseNotification } from '../services/notificationService';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -222,6 +223,8 @@ export const useSplitStore = create<SplitState>()((set, get) => ({
   },
 
   addExpense: async (groupId, expense) => {
+    const { data: { user } } = await supabase.auth.getUser();
+
     const { data, error } = await supabase
       .from('group_expenses')
       .insert([{ ...expense, group_id: groupId }])
@@ -231,6 +234,25 @@ export const useSplitStore = create<SplitState>()((set, get) => ({
     if (error || !data) {
       console.error('Failed to add expense:', error);
       return;
+    }
+
+    // Send push notifications to other group members
+    if (user) {
+      const group = get().groups.find((g) => g.id === groupId);
+      const memberUserIds = (group?.members || [])
+        .map((m) => m.user_id)
+        .filter(Boolean) as string[];
+
+      if (group && memberUserIds.length > 1) {
+        sendExpenseNotification({
+          groupName: group.name,
+          description: expense.description,
+          paidBy: expense.paid_by,
+          amount: expense.total_amount,
+          memberUserIds,
+          currentUserId: user.id,
+        });
+      }
     }
     // Real-time subscription will update the state automatically
   },
