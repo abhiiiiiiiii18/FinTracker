@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import React, { useEffect } from 'react';
-import { Home, PlusCircle, PieChart } from 'lucide-react-native';
+import { Home, PlusCircle, PieChart, Users } from 'lucide-react-native';
 import { useFinanceStore } from '../store/useFinanceStore';
 
 const darkTheme = {
@@ -50,11 +50,22 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="splits"
+        options={{
+          title: 'Splits',
+          tabBarIcon: ({ color, size }) => <Users size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="budget"
         options={{
           title: 'Budget',
           tabBarIcon: ({ color, size }) => <PieChart size={size} color={color} />,
         }}
+      />
+      <Tabs.Screen
+        name="split-detail"
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="explore"

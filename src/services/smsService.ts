@@ -1,4 +1,4 @@
-import { PermissionsAndroid, Platform } from 'react-native';
+import { Alert, PermissionsAndroid, Platform } from 'react-native';
 import SmsAndroid from 'react-native-get-sms-android';
 
 export interface SmsMessage {
@@ -22,15 +22,18 @@ export interface SmsMessage {
 export async function requestSmsPermission(): Promise<boolean> {
   if (Platform.OS !== 'android') return false;
   try {
-    const granted = await PermissionsAndroid.requestMultiple([
+    const granted = await PermissionsAndroid.request(
       PermissionsAndroid.PERMISSIONS.READ_SMS,
-      PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
-    ]);
-
-    return (
-      granted['android.permission.READ_SMS'] === PermissionsAndroid.RESULTS.GRANTED &&
-      granted['android.permission.RECEIVE_SMS'] === PermissionsAndroid.RESULTS.GRANTED
+      {
+        title: 'SMS Permission',
+        message: 'This app needs access to your SMS to read financial transactions.',
+        buttonNeutral: 'Ask Me Later',
+        buttonNegative: 'Cancel',
+        buttonPositive: 'OK',
+      }
     );
+
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
   } catch (err) {
     console.warn('Failed to prompt for SMS permissions:', err);
     return false;
@@ -50,16 +53,16 @@ export async function fetchServiceSMS(): Promise<SmsMessage[]> {
 
   const hasPermission = await requestSmsPermission();
   if (!hasPermission) {
-    console.warn('Read/Receive SMS permissions were denied by the user.');
+    Alert.alert('Permission Denied', 'Cannot read SMS without permissions.');
     return [];
   }
 
   const now = Date.now();
-  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
   
   const filter = {
     box: 'inbox',
-    minDate: now - ONE_DAY_MS,
+    minDate: now - THIRTY_DAYS_MS,
     maxDate: now,
   };
 
@@ -75,21 +78,20 @@ export async function fetchServiceSMS(): Promise<SmsMessage[]> {
           const messages: SmsMessage[] = JSON.parse(smsList);
           
           // Filter out typical private mobile numbers to only get service headers
-          // We apply the specific regex format for bank/transaction service headers.
           const filtered = messages.filter((msg) => {
             const address = msg.address || '';
             
-            // First pass fail-safe: explicitly reject any strict multi-numeric sequences.
+            // Explicitly reject any strict multi-numeric sequences (phone numbers).
             const isPhoneNumber = /^\+?\d{10,15}$/.test(address);
             if (isPhoneNumber) return false;
             
-            // Target header format string:
-            // e.g., AD-HDFCBK, VK-ICICIB, DM-SBIGRO
-            // 2 letters, optional trailing hyphen, 6 alphanumerics.
-            const isServiceHeader = /^[a-zA-Z]{2}-?[a-zA-Z0-9]{6}$/.test(address);
-            
-            return isServiceHeader;
+            // Allow any address that contains at least one letter (service headers)
+            return /[a-zA-Z]/.test(address);
           });
+          
+          if (filtered.length === 0) {
+            Alert.alert('No valid messages', 'Could not find any transaction SMS in the last 30 days.');
+          }
           
           resolve(filtered);
         } catch (e) {
