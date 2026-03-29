@@ -10,9 +10,11 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Users, Plus, Trash2, ChevronRight, X, UserPlus } from 'lucide-react-native';
+import { Users, Plus, Trash2, ChevronRight, X, UserPlus, BookUser } from 'lucide-react-native';
+import * as Contacts from 'expo-contacts';
 import { useSplitStore, computeNetBalances, simplifyDebts } from '../store/useSplitStore';
 import type { Group } from '../store/useSplitStore';
 
@@ -83,6 +85,42 @@ function NewGroupModal({ visible, onClose }: { visible: boolean; onClose: () => 
     setMemberInput('');
   };
 
+  const pickFromContacts = async () => {
+    const { status } = await Contacts.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Allow contacts access to pick friends easily.');
+      return;
+    }
+    const { data } = await Contacts.getContactsAsync({
+      fields: [Contacts.Fields.Name],
+      sort: Contacts.SortTypes.FirstName,
+    });
+    if (!data || data.length === 0) {
+      Alert.alert('No Contacts', 'No contacts found on this device.');
+      return;
+    }
+    // Show a simple alert list — for a proper picker UX we show top 20 contacts
+    const names = data
+      .filter((c: Contacts.Contact) => c.name)
+      .slice(0, 20)
+      .map((c: Contacts.Contact) => c.name as string);
+
+    Alert.alert(
+      'Pick a Contact',
+      'Select a contact to add as a member:',
+      [
+        ...names.map((n: string) => ({
+          text: n,
+          onPress: () => {
+            if (!members.includes(n)) setMembers((prev) => [...prev, n]);
+            else Alert.alert('Already added', `${n} is already in the group.`);
+          },
+        })),
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
   const handleCreate = async () => {
     if (!name.trim()) { Alert.alert('Missing', 'Please enter a group name.'); return; }
     if (members.length < 2) { Alert.alert('Missing', 'Add at least 2 members.'); return; }
@@ -127,6 +165,9 @@ function NewGroupModal({ visible, onClose }: { visible: boolean; onClose: () => 
             />
             <TouchableOpacity style={styles.addMemberBtn} onPress={addMember}>
               <UserPlus color={theme.primary} size={20} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.addMemberBtn, { backgroundColor: '#1A3D2B' }]} onPress={pickFromContacts}>
+              <BookUser color={theme.accent} size={20} />
             </TouchableOpacity>
           </View>
 

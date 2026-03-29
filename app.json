@@ -19,6 +19,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
+        "android.permission.READ_CONTACTS",
         "android.permission.READ_SMS",
         "android.permission.RECEIVE_SMS"
       ],
