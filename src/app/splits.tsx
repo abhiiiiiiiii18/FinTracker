@@ -15,7 +15,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Users, Plus, Trash2, ChevronRight, X, UserPlus, BookUser } from 'lucide-react-native';
 import * as Contacts from 'expo-contacts';
-import { useSplitStore, computeNetBalances, simplifyDebts } from '../store/useSplitStore';
+import { useSplitStore, computeNetBalances, simplifyDebts, GroupInvitation } from '../store/useSplitStore';
 import type { Group } from '../store/useSplitStore';
 
 const theme = {
@@ -125,7 +125,7 @@ function NewGroupModal({ visible, onClose }: { visible: boolean; onClose: () => 
     if (!name.trim()) { Alert.alert('Missing', 'Please enter a group name.'); return; }
     if (members.length < 2) { Alert.alert('Missing', 'Add at least 2 members.'); return; }
     setLoading(true);
-    await createGroup(name.trim(), members);
+    await createGroup(name.trim(), members.map((m) => ({ name: m })));
     setLoading(false);
     setName('');
     setMembers([]);
@@ -199,13 +199,25 @@ function NewGroupModal({ visible, onClose }: { visible: boolean; onClose: () => 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function SplitsScreen() {
-  const { groups, isLoaded, fetchGroups, deleteGroup } = useSplitStore();
+  const { groups, isLoaded, fetchGroups, deleteGroup, pendingInvitations, fetchPendingInvitations, acceptInvitation } = useSplitStore();
   const [modalVisible, setModalVisible] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     fetchGroups();
+    fetchPendingInvitations();
   }, []);
+
+  const handleAcceptInvite = (inv: GroupInvitation) => {
+    Alert.alert(
+      'Join Group',
+      `Accept invitation to join this group?`,
+      [
+        { text: 'Decline', style: 'cancel' },
+        { text: 'Join', onPress: () => acceptInvitation(inv.id, inv.group_id) },
+      ]
+    );
+  };
 
   const handleDelete = (group: Group) => {
     Alert.alert(
@@ -227,6 +239,19 @@ export default function SplitsScreen() {
           <Text style={styles.newGroupBtnText}>New Group</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Pending invitations banner */}
+      {pendingInvitations.length > 0 && (
+        <View style={styles.inviteBanner}>
+          <Text style={styles.inviteBannerTitle}>📬 {pendingInvitations.length} pending invite{pendingInvitations.length > 1 ? 's' : ''}</Text>
+          {pendingInvitations.map((inv) => (
+            <TouchableOpacity key={inv.id} style={styles.inviteRow} onPress={() => handleAcceptInvite(inv)}>
+              <Text style={styles.inviteText}>Tap to join group</Text>
+              <Text style={styles.inviteAccept}>Accept →</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {!isLoaded ? (
         <ActivityIndicator color={theme.primary} style={{ marginTop: 60 }} />
@@ -360,4 +385,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   createBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  // Invite banner
+  inviteBanner: {
+    marginHorizontal: 20, marginBottom: 12, backgroundColor: '#1A2F1A',
+    borderRadius: 14, padding: 14, borderWidth: 1, borderColor: theme.accent,
+  },
+  inviteBannerTitle: { color: theme.accent, fontWeight: '700', fontSize: 14, marginBottom: 8 },
+  inviteRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
+  inviteText: { color: theme.text, fontSize: 13 },
+  inviteAccept: { color: theme.accent, fontWeight: '700', fontSize: 13 },
 });
