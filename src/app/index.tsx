@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ScrollView, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
 import { useFinanceStore, Transaction } from '../store/useFinanceStore';
-import { ArrowDownRight, TrendingUp, AlertCircle, CheckCircle, BellRing, RefreshCw } from 'lucide-react-native';
+import { useAuthStore } from '../store/useAuthStore';
+import { ArrowDownRight, TrendingUp, AlertCircle, CheckCircle, BellRing, RefreshCw, LogOut } from 'lucide-react-native';
 
 const darkTheme = {
   background: '#0F172A',
@@ -31,7 +32,9 @@ const TransactionItem = ({ item }: { item: Transaction }) => (
 
 export default function Dashboard() {
   const { transactions, budget, getInsights, syncSMS } = useFinanceStore();
+  const { user, signOut } = useAuthStore();
   const [isSyncing, setIsSyncing] = useState(false);
+  const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'Tracker';
   
   const currentMonthIdx = new Date().getMonth();
   const thisMonthTxs = transactions.filter(t => new Date(t.date).getMonth() === currentMonthIdx);
@@ -47,19 +50,26 @@ export default function Dashboard() {
     setIsSyncing(false);
   };
 
+  const handleLogout = () => {
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log Out', style: 'destructive', onPress: signOut },
+    ]);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.greeting}>Hello, Tracker!</Text>
+          <Text style={styles.greeting}>Hey, {firstName}! 👋</Text>
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <TouchableOpacity onPress={handleSync} disabled={isSyncing} style={styles.iconBtn}>
               <RefreshCw color={isSyncing ? darkTheme.textSecondary : darkTheme.primary} size={24} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconBtn}>
-              <BellRing color={darkTheme.textSecondary} size={24} />
+            <TouchableOpacity style={styles.iconBtn} onPress={handleLogout}>
+              <LogOut color={darkTheme.danger} size={22} />
             </TouchableOpacity>
           </View>
         </View>

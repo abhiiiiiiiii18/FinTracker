@@ -1,25 +1,62 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter, useSegments } from 'expo-router';
 import React, { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { Home, PlusCircle, PieChart, Users } from 'lucide-react-native';
 import { useFinanceStore } from '../store/useFinanceStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 const darkTheme = {
-  background: '#0F172A', // slate-900
-  card: '#1E293B', // slate-800
-  text: '#F8FAFC', // slate-50
-  textSecondary: '#94A3B8', // slate-400
-  primary: '#3B82F6', // blue-500
-  accent: '#10B981', // emerald-500
-  danger: '#EF4444', // red-500
-  border: '#334155', // slate-700
+  background: '#0F172A',
+  card: '#1E293B',
+  text: '#F8FAFC',
+  textSecondary: '#94A3B8',
+  primary: '#3B82F6',
+  accent: '#10B981',
+  danger: '#EF4444',
+  border: '#334155',
 };
 
 export default function TabLayout() {
   const initFetch = useFinanceStore((state) => state.initFetch);
+  const { user, initialized, initialize } = useAuthStore();
+  const router = useRouter();
+  const segments = useSegments();
 
+  // Initialize auth state once on app start
   useEffect(() => {
-    initFetch();
-  }, [initFetch]);
+    initialize();
+  }, []);
+
+  // Redirect based on auth state
+  useEffect(() => {
+    if (!initialized) return;
+
+    const inAuthGroup = segments[0] === 'auth';
+
+    if (!user && !inAuthGroup) {
+      // Not logged in → go to login
+      router.replace('/auth/login');
+    } else if (user && inAuthGroup) {
+      // Logged in but on auth screen → go to app
+      router.replace('/');
+    }
+  }, [user, initialized, segments]);
+
+  // Fetch user data only when logged in
+  useEffect(() => {
+    if (user) {
+      initFetch();
+    }
+  }, [user]);
+
+  // Show loading spinner while checking auth
+  if (!initialized) {
+    return (
+      <View style={{ flex: 1, backgroundColor: darkTheme.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={darkTheme.primary} />
+      </View>
+    );
+  }
 
   return (
     <Tabs
@@ -68,9 +105,13 @@ export default function TabLayout() {
         options={{ href: null }}
       />
       <Tabs.Screen
+        name="auth"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
         name="explore"
         options={{
-          href: null, // Hide from tabs
+          href: null,
         }}
       />
     </Tabs>
