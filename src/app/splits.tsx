@@ -91,44 +91,24 @@ function NewGroupModal({ visible, onClose }: { visible: boolean; onClose: () => 
       Alert.alert('Permission Denied', 'Allow contacts access to pick friends easily.');
       return;
     }
-    const { data } = await Contacts.getContactsAsync({
-      fields: [Contacts.Fields.Name, Contacts.Fields.FirstName, Contacts.Fields.LastName],
-      sort: Contacts.SortTypes.FirstName,
-    });
-    if (!data || data.length === 0) {
-      Alert.alert('No Contacts', 'No contacts found on this device.');
+
+    const contact = await Contacts.presentContactPickerAsync();
+    if (!contact) return;
+
+    const name = contact.name?.trim() ||
+      [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+
+    if (!name) {
+      Alert.alert('No Name', 'This contact has no name saved.');
       return;
     }
 
-    // Build name from firstName + lastName if name is missing
-    const names = data
-      .map((c: Contacts.Contact) => {
-        if (c.name && c.name.trim()) return c.name.trim();
-        const parts = [c.firstName, c.lastName].filter(Boolean);
-        return parts.length > 0 ? parts.join(' ') : null;
-      })
-      .filter(Boolean)
-      .slice(0, 20) as string[];
-
-    if (names.length === 0) {
-      Alert.alert('No Contacts', 'Could not read contact names.');
+    if (members.includes(name)) {
+      Alert.alert('Already added', `${name} is already in the group.`);
       return;
     }
 
-    Alert.alert(
-      'Pick a Contact',
-      'Select a contact to add as a member:',
-      [
-        ...names.map((n: string) => ({
-          text: n,
-          onPress: () => {
-            if (!members.includes(n)) setMembers((prev) => [...prev, n]);
-            else Alert.alert('Already added', `${n} is already in the group.`);
-          },
-        })),
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    setMembers((prev) => [...prev, name]);
   };
 
   const handleCreate = async () => {
