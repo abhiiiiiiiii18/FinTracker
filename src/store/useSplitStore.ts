@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
-import { sendExpenseNotification } from '../services/notificationService';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { create } from "zustand";
+import { supabase } from "../lib/supabase";
+import { sendExpenseNotification } from "../services/notificationService";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,7 +16,7 @@ export interface GroupExpense {
   description: string;
   total_amount: number;
   paid_by: string;
-  split_type: 'equal' | 'custom';
+  split_type: "equal" | "custom";
   splits: SplitShare[];
   created_at: string;
 }
@@ -26,14 +26,14 @@ export interface GroupMember {
   name: string;
   user_id?: string;
   email?: string;
-  status: 'active' | 'pending';
+  status: "active" | "pending";
 }
 
 export interface GroupInvitation {
   id: string;
   group_id: string;
   invited_email: string;
-  status: 'pending' | 'accepted' | 'declined';
+  status: "pending" | "accepted" | "declined";
   created_at: string;
 }
 
@@ -55,7 +55,9 @@ export interface DebtStatement {
 
 // ─── Balance helpers ──────────────────────────────────────────────────────────
 
-export function computeNetBalances(expenses: GroupExpense[]): Record<string, number> {
+export function computeNetBalances(
+  expenses: GroupExpense[],
+): Record<string, number> {
   const balances: Record<string, number> = {};
   for (const exp of expenses) {
     balances[exp.paid_by] = (balances[exp.paid_by] || 0) + exp.total_amount;
@@ -66,7 +68,9 @@ export function computeNetBalances(expenses: GroupExpense[]): Record<string, num
   return balances;
 }
 
-export function simplifyDebts(balances: Record<string, number>): DebtStatement[] {
+export function simplifyDebts(
+  balances: Record<string, number>,
+): DebtStatement[] {
   const creditors: { name: string; amount: number }[] = [];
   const debtors: { name: string; amount: number }[] = [];
 
@@ -76,12 +80,17 @@ export function simplifyDebts(balances: Record<string, number>): DebtStatement[]
   }
 
   const statements: DebtStatement[] = [];
-  let i = 0, j = 0;
+  let i = 0,
+    j = 0;
   while (i < debtors.length && j < creditors.length) {
     const debtor = debtors[i];
     const creditor = creditors[j];
     const settled = Math.min(debtor.amount, creditor.amount);
-    statements.push({ from: debtor.name, to: creditor.name, amount: Math.round(settled * 100) / 100 });
+    statements.push({
+      from: debtor.name,
+      to: creditor.name,
+      amount: Math.round(settled * 100) / 100,
+    });
     debtor.amount -= settled;
     creditor.amount -= settled;
     if (debtor.amount < 0.01) i++;
@@ -99,11 +108,26 @@ interface SplitState {
   activeChannels: Record<string, RealtimeChannel>;
 
   fetchGroups: () => Promise<void>;
-  createGroup: (name: string, members: { name: string }[]) => Promise<Group | null>;
-  addExpense: (groupId: string, expense: Omit<GroupExpense, 'id' | 'group_id' | 'created_at'>) => Promise<void>;
-  settleDebt: (groupId: string, from: string, to: string, amount: number) => Promise<void>;
+  createGroup: (
+    name: string,
+    members: { name: string }[],
+  ) => Promise<Group | null>;
+  addExpense: (
+    groupId: string,
+    expense: Omit<GroupExpense, "id" | "group_id" | "created_at">,
+  ) => Promise<void>;
+  settleDebt: (
+    groupId: string,
+    from: string,
+    to: string,
+    amount: number,
+  ) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
-  inviteMember: (groupId: string, email: string, displayName: string) => Promise<string | null>;
+  inviteMember: (
+    groupId: string,
+    email: string,
+    displayName: string,
+  ) => Promise<string | null>;
   acceptInvitation: (invitationId: string, groupId: string) => Promise<void>;
   subscribeToGroup: (groupId: string) => void;
   unsubscribeFromGroup: (groupId: string) => void;
@@ -118,14 +142,16 @@ export const useSplitStore = create<SplitState>()((set, get) => ({
 
   fetchGroups: async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       // Fetch groups created by or member of
       const { data: groupsData, error: gErr } = await supabase
-        .from('groups')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .from("groups")
+        .select("*")
+        .order("created_at", { ascending: false });
 
       if (gErr) throw gErr;
       if (!groupsData || groupsData.length === 0) {
@@ -136,9 +162,13 @@ export const useSplitStore = create<SplitState>()((set, get) => ({
       const groupIds = groupsData.map((g: any) => g.id);
 
       const [membersRes, expensesRes, invitationsRes] = await Promise.all([
-        supabase.from('group_members').select('*').in('group_id', groupIds),
-        supabase.from('group_expenses').select('*').in('group_id', groupIds).order('created_at', { ascending: true }),
-        supabase.from('group_invitations').select('*').in('group_id', groupIds),
+        supabase.from("group_members").select("*").in("group_id", groupIds),
+        supabase
+          .from("group_expenses")
+          .select("*")
+          .in("group_id", groupIds)
+          .order("created_at", { ascending: true }),
+        supabase.from("group_invitations").select("*").in("group_id", groupIds),
       ]);
 
       const groups: Group[] = groupsData.map((g: any) => ({
@@ -153,13 +183,14 @@ export const useSplitStore = create<SplitState>()((set, get) => ({
             name: m.name,
             user_id: m.user_id,
             email: m.email,
-            status: m.status || 'active',
+            status: m.status || "active",
           })),
         expenses: (expensesRes.data || [])
           .filter((e: any) => e.group_id === g.id)
           .map((e: any) => ({ ...e, splits: e.splits as SplitShare[] })),
-        invitations: (invitationsRes.data || [])
-          .filter((i: any) => i.group_id === g.id),
+        invitations: (invitationsRes.data || []).filter(
+          (i: any) => i.group_id === g.id,
+        ),
       }));
 
       set({ groups, isLoaded: true });
@@ -167,23 +198,25 @@ export const useSplitStore = create<SplitState>()((set, get) => ({
       // Subscribe to real-time for all groups
       groupIds.forEach((id: string) => get().subscribeToGroup(id));
     } catch (err) {
-      console.error('Failed to fetch groups:', err);
+      console.error("Failed to fetch groups:", err);
       set({ isLoaded: true });
     }
   },
 
   createGroup: async (name, members) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return null;
 
     const { data: groupData, error: gErr } = await supabase
-      .from('groups')
+      .from("groups")
       .insert([{ name, created_by: user.id }])
       .select()
       .single();
 
     if (gErr || !groupData) {
-      console.error('Failed to create group:', gErr);
+      console.error("Failed to create group:", gErr);
       return null;
     }
 
@@ -191,15 +224,15 @@ export const useSplitStore = create<SplitState>()((set, get) => ({
     const memberRows = members.map((m) => ({
       group_id: groupData.id,
       name: m.name,
-      status: 'active',
+      status: "active",
     }));
 
     const { data: membersData, error: mErr } = await supabase
-      .from('group_members')
+      .from("group_members")
       .insert(memberRows)
       .select();
 
-    if (mErr) console.error('Failed to insert members:', mErr);
+    if (mErr) console.error("Failed to insert members:", mErr);
 
     const newGroup: Group = {
       id: groupData.id,
@@ -211,7 +244,7 @@ export const useSplitStore = create<SplitState>()((set, get) => ({
         name: m.name,
         user_id: m.user_id,
         email: m.email,
-        status: m.status || 'active',
+        status: m.status || "active",
       })),
       expenses: [],
       invitations: [],
@@ -223,16 +256,18 @@ export const useSplitStore = create<SplitState>()((set, get) => ({
   },
 
   addExpense: async (groupId, expense) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     const { data, error } = await supabase
-      .from('group_expenses')
+      .from("group_expenses")
       .insert([{ ...expense, group_id: groupId }])
       .select()
       .single();
 
     if (error || !data) {
-      console.error('Failed to add expense:', error);
+      console.error("Failed to add expense:", error);
       return;
     }
 
@@ -262,38 +297,64 @@ export const useSplitStore = create<SplitState>()((set, get) => ({
       description: `✅ Settlement: ${from} → ${to}`,
       total_amount: amount,
       paid_by: to,
-      split_type: 'custom',
+      split_type: "custom",
       splits: [{ name: from, amount }],
     });
   },
 
   deleteGroup: async (groupId) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      console.error("Not logged in");
+      return;
+    }
+
+    // Verify user is group owner before deletion
+    const group = get().groups.find((g) => g.id === groupId);
+    if (!group || group.created_by !== user.id) {
+      console.error("Unauthorized: Only group creator can delete");
+      return;
+    }
+
     get().unsubscribeFromGroup(groupId);
-    const { error } = await supabase.from('groups').delete().eq('id', groupId);
-    if (error) { console.error('Failed to delete group:', error); return; }
+    const { error } = await supabase.from("groups").delete().eq("id", groupId);
+    if (error) {
+      console.error("Failed to delete group:", error);
+      return;
+    }
     set((state) => ({ groups: state.groups.filter((g) => g.id !== groupId) }));
   },
 
   inviteMember: async (groupId, email, displayName) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return 'Not logged in';
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return "Not logged in";
 
     // Add as pending member
-    const { error: memberErr } = await supabase.from('group_members').insert([{
-      group_id: groupId,
-      name: displayName,
-      email,
-      status: 'pending',
-    }]);
+    const { error: memberErr } = await supabase.from("group_members").insert([
+      {
+        group_id: groupId,
+        name: displayName,
+        email,
+        status: "pending",
+      },
+    ]);
     if (memberErr) return memberErr.message;
 
     // Create invitation record
-    const { error: inviteErr } = await supabase.from('group_invitations').insert([{
-      group_id: groupId,
-      invited_email: email,
-      invited_by: user.id,
-      status: 'pending',
-    }]);
+    const { error: inviteErr } = await supabase
+      .from("group_invitations")
+      .insert([
+        {
+          group_id: groupId,
+          invited_email: email,
+          invited_by: user.id,
+          status: "pending",
+        },
+      ]);
     if (inviteErr) return inviteErr.message;
 
     // Refresh group data
@@ -302,32 +363,38 @@ export const useSplitStore = create<SplitState>()((set, get) => ({
   },
 
   acceptInvitation: async (invitationId, groupId) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     // Mark invitation accepted
-    await supabase.from('group_invitations')
-      .update({ status: 'accepted' })
-      .eq('id', invitationId);
+    await supabase
+      .from("group_invitations")
+      .update({ status: "accepted" })
+      .eq("id", invitationId);
 
     // Link the group_member row to this user account
-    await supabase.from('group_members')
-      .update({ user_id: user.id, status: 'active' })
-      .eq('group_id', groupId)
-      .eq('email', user.email);
+    await supabase
+      .from("group_members")
+      .update({ user_id: user.id, status: "active" })
+      .eq("group_id", groupId)
+      .eq("email", user.email);
 
     await get().fetchGroups();
   },
 
   fetchPendingInvitations: async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user || !user.email) return;
 
     const { data } = await supabase
-      .from('group_invitations')
-      .select('*')
-      .eq('invited_email', user.email)
-      .eq('status', 'pending');
+      .from("group_invitations")
+      .select("*")
+      .eq("invited_email", user.email)
+      .eq("status", "pending");
 
     set({ pendingInvitations: data || [] });
   },
@@ -339,21 +406,26 @@ export const useSplitStore = create<SplitState>()((set, get) => ({
     const channel = supabase
       .channel(`group-${groupId}`)
       .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'group_expenses', filter: `group_id=eq.${groupId}` },
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "group_expenses",
+          filter: `group_id=eq.${groupId}`,
+        },
         (payload) => {
           const newExpense: GroupExpense = {
-            ...payload.new as any,
+            ...(payload.new as any),
             splits: (payload.new as any).splits as SplitShare[],
           };
           set((state) => ({
             groups: state.groups.map((g) =>
               g.id === groupId
                 ? { ...g, expenses: [...g.expenses, newExpense] }
-                : g
+                : g,
             ),
           }));
-        }
+        },
       )
       .subscribe();
 

@@ -1,45 +1,74 @@
-import React, { useState, useRef } from 'react';
+import { LinearGradient } from "expo-linear-gradient";
+import * as Notifications from "expo-notifications";
+import { useRouter } from "expo-router";
+import { CheckCircle2 } from "lucide-react-native";
+import React, { useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, SafeAreaView, KeyboardAvoidingView, Platform,
-  Alert, Animated,
-} from 'react-native';
-import { useFinanceStore, TransactionCategory } from '../store/useFinanceStore';
-import { useRouter } from 'expo-router';
-import * as Notifications from 'expo-notifications';
-import { colors, radius, shadow, CATEGORY_META } from '../constants/theme';
-import { LinearGradient } from 'expo-linear-gradient';
-import { CheckCircle2 } from 'lucide-react-native';
+    Alert,
+    Animated,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { CATEGORY_META, colors, radius, shadow } from "../constants/theme";
+import { TransactionCategory, useFinanceStore } from "../store/useFinanceStore";
 
-const CATEGORIES: TransactionCategory[] = ['Food', 'Transport', 'Entertainment', 'Bills', 'Other'];
+const CATEGORIES: TransactionCategory[] = [
+  "Food",
+  "Transport",
+  "Entertainment",
+  "Bills",
+  "Other",
+];
 
 export default function AddTransaction() {
   const router = useRouter();
   const { addTransaction, budget, transactions } = useFinanceStore();
 
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<TransactionCategory>('Food');
-  const [note, setNote] = useState('');
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState<TransactionCategory>("Food");
+  const [note, setNote] = useState("");
 
   const btnScale = useRef(new Animated.Value(1)).current;
 
   const handleSave = async () => {
+    // Validate amount
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount.');
+      Alert.alert("Invalid Amount", "Please enter a valid amount.");
       return;
     }
 
     const value = parseFloat(amount);
 
+    // Validate amount is reasonable (not >1,000,000)
+    if (value > 1000000) {
+      Alert.alert("Invalid Amount", "Amount cannot exceed ₹10,00,000.");
+      return;
+    }
+
+    // Validate note length
+    if (note.trim().length > 200) {
+      Alert.alert("Note Too Long", "Note must be less than 200 characters.");
+      return;
+    }
+
     const currentMonthIdx = new Date().getMonth();
-    const thisMonthTxs = transactions.filter(t => new Date(t.date).getMonth() === currentMonthIdx);
+    const thisMonthTxs = transactions.filter(
+      (t) => new Date(t.date).getMonth() === currentMonthIdx,
+    );
     const totalSpent = thisMonthTxs.reduce((sum, t) => sum + t.amount, 0);
 
     if (totalSpent + value > budget.totalLimit) {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '🚨 Budget Alert',
-          body: 'This transaction puts you over your monthly limit!',
+          title: "🚨 Budget Alert",
+          body: "This transaction puts you over your monthly limit!",
           sound: true,
         },
         trigger: null,
@@ -51,8 +80,13 @@ export default function AddTransaction() {
       Animated.spring(btnScale, { toValue: 0.95, useNativeDriver: true }),
       Animated.spring(btnScale, { toValue: 1, useNativeDriver: true }),
     ]).start(() => {
-      addTransaction({ amount: value, category, note, source: 'manual' });
-      router.push('/');
+      addTransaction({
+        amount: value,
+        category,
+        note: note.trim(),
+        source: "manual",
+      });
+      router.push("/");
     });
   };
 
@@ -60,13 +94,21 @@ export default function AddTransaction() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* ── HEADER ───────────────────────────── */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>New Expense</Text>
-            <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.closeBtn}
+            >
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -74,7 +116,7 @@ export default function AddTransaction() {
           {/* ── AMOUNT ENTRY ─────────────────────── */}
           <View style={styles.amountSection}>
             <LinearGradient
-              colors={[meta.bg, 'transparent']}
+              colors={[meta.bg, "transparent"]}
               style={styles.amountGlow}
             />
             <Text style={styles.currencySymbol}>₹</Text>
@@ -92,7 +134,7 @@ export default function AddTransaction() {
           {/* ── CATEGORY GRID ────────────────────── */}
           <Text style={styles.sectionLabel}>CATEGORY</Text>
           <View style={styles.categoryGrid}>
-            {CATEGORIES.map(cat => {
+            {CATEGORIES.map((cat) => {
               const catMeta = CATEGORY_META[cat];
               const isActive = category === cat;
               return (
@@ -108,14 +150,32 @@ export default function AddTransaction() {
                     },
                   ]}
                 >
-                  <View style={[styles.categoryEmojiBg, { backgroundColor: isActive ? catMeta.color + '30' : colors.bgCardAlt }]}>
+                  <View
+                    style={[
+                      styles.categoryEmojiBg,
+                      {
+                        backgroundColor: isActive
+                          ? catMeta.color + "30"
+                          : colors.bgCardAlt,
+                      },
+                    ]}
+                  >
                     <Text style={styles.categoryEmoji}>{catMeta.emoji}</Text>
                   </View>
-                  <Text style={[styles.categoryLabel, isActive && { color: catMeta.color }]}>
+                  <Text
+                    style={[
+                      styles.categoryLabel,
+                      isActive && { color: catMeta.color },
+                    ]}
+                  >
                     {catMeta.label}
                   </Text>
                   {isActive && (
-                    <CheckCircle2 size={14} color={catMeta.color} style={styles.checkIcon} />
+                    <CheckCircle2
+                      size={14}
+                      color={catMeta.color}
+                      style={styles.checkIcon}
+                    />
                   )}
                 </TouchableOpacity>
               );
@@ -140,7 +200,7 @@ export default function AddTransaction() {
           <Animated.View style={{ transform: [{ scale: btnScale }] }}>
             <TouchableOpacity onPress={handleSave} activeOpacity={0.85}>
               <LinearGradient
-                colors={['#6D28D9', '#8B5CF6', '#7C3AED']}
+                colors={["#6D28D9", "#8B5CF6", "#7C3AED"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.saveBtn}
@@ -148,13 +208,12 @@ export default function AddTransaction() {
                 <Text style={styles.saveBtnText}>Save Expense</Text>
                 <View style={styles.saveBtnBadge}>
                   <Text style={styles.saveBtnBadgeText}>
-                    {amount ? `₹${parseFloat(amount || '0').toFixed(2)}` : '₹0'}
+                    {amount ? `₹${parseFloat(amount || "0").toFixed(2)}` : "₹0"}
                   </Text>
                 </View>
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -174,14 +233,14 @@ const styles = StyleSheet.create({
 
   // ── Header
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 36,
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: "900",
     color: colors.text,
     letterSpacing: -0.5,
   },
@@ -190,54 +249,54 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     backgroundColor: colors.bgCard,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: colors.border,
   },
   closeBtnText: {
     color: colors.textMuted,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   // ── Amount
   amountSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 40,
-    position: 'relative',
+    position: "relative",
   },
   amountGlow: {
-    position: 'absolute',
+    position: "absolute",
     width: 200,
     height: 200,
     borderRadius: 100,
     top: -50,
-    alignSelf: 'center',
+    alignSelf: "center",
     opacity: 0.4,
   },
   currencySymbol: {
     fontSize: 52,
-    fontWeight: '900',
+    fontWeight: "900",
     color: colors.violet,
     marginRight: 6,
     marginTop: 8,
   },
   amountInput: {
     fontSize: 72,
-    fontWeight: '900',
+    fontWeight: "900",
     color: colors.text,
     letterSpacing: -2,
     minWidth: 140,
-    textAlign: 'center',
+    textAlign: "center",
   },
 
   // ── Section Label
   sectionLabel: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.textMuted,
     letterSpacing: 2,
     marginBottom: 14,
@@ -246,27 +305,27 @@ const styles = StyleSheet.create({
 
   // ── Category Grid
   categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
     marginBottom: 32,
   },
   categoryCard: {
-    width: '30%',
+    width: "30%",
     backgroundColor: colors.bgCard,
     borderRadius: radius.md,
     padding: 14,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1.5,
     borderColor: colors.border,
-    position: 'relative',
+    position: "relative",
   },
   categoryEmojiBg: {
     width: 44,
     height: 44,
     borderRadius: radius.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 8,
   },
   categoryEmoji: {
@@ -274,12 +333,12 @@ const styles = StyleSheet.create({
   },
   categoryLabel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.textMuted,
-    textAlign: 'center',
+    textAlign: "center",
   },
   checkIcon: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
   },
@@ -291,14 +350,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: 32,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   noteInput: {
     padding: 16,
     color: colors.text,
     fontSize: 15,
     minHeight: 90,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
     lineHeight: 22,
   },
 
@@ -307,27 +366,27 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     paddingVertical: 18,
     paddingHorizontal: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 12,
     ...shadow.violet,
   },
   saveBtnText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: -0.3,
   },
   saveBtnBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: "rgba(255,255,255,0.2)",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: radius.pill,
   },
   saveBtnBadgeText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });
