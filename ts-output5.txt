@@ -1,0 +1,18 @@
+src/app/split-detail.tsx(606,42): error TS2339: Property 'textSecondary' does not exist on type '{ bg: string; bgDeep: string; bgCard: string; bgGlass: string; bgCardAlt: string; gradientHero: readonly ["#1A0A3C", "#200D50", "#130730"]; gradientCard: readonly ["#111827", "#0D1424"]; gradientPrimary: readonly [...]; ... 31 more ...; borderSubtle: string; }'.
+src/components/hint-row.tsx(31,27): error TS2339: Property 'two' does not exist on type '{}'.
+src/components/hint-row.tsx(32,30): error TS2339: Property 'half' does not exist on type '{}'.
+src/components/hint-row.tsx(33,32): error TS2339: Property 'two' does not exist on type '{}'.
+src/components/themed-text.tsx(17,18): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ text: string; background: string; tint: string; icon: string; tabIconDefault: string; tabIconSelected: string; } | { text: string; background: string; tint: string; icon: string; tabIconDefault: string; tabIconSelected: string; }'.
+  No index signature with a parameter of type 'string' was found on type '{ text: string; background: string; tint: string; icon: string; tabIconDefault: string; tabIconSelected: string; } | { text: string; background: string; tint: string; icon: string; tabIconDefault: string; tabIconSelected: string; }'.
+src/components/themed-text.tsx(69,23): error TS2339: Property 'mono' does not exist on type '{}'.
+src/components/themed-view.tsx(15,43): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ text: string; background: string; tint: string; icon: string; tabIconDefault: string; tabIconSelected: string; } | { text: string; background: string; tint: string; icon: string; tabIconDefault: string; tabIconSelected: string; }'.
+  No index signature with a parameter of type 'string' was found on type '{ text: string; background: string; tint: string; icon: string; tabIconDefault: string; tabIconSelected: string; } | { text: string; background: string; tint: string; icon: string; tabIconDefault: string; tabIconSelected: string; }'.
+src/components/ui/collapsible.tsx(47,18): error TS2339: Property 'two' does not exist on type '{}'.
+src/components/ui/collapsible.tsx(53,20): error TS2339: Property 'four' does not exist on type '{}'.
+src/components/ui/collapsible.tsx(54,21): error TS2339: Property 'four' does not exist on type '{}'.
+src/components/ui/collapsible.tsx(60,24): error TS2339: Property 'three' does not exist on type '{}'.
+src/components/ui/collapsible.tsx(61,27): error TS2339: Property 'three' does not exist on type '{}'.
+src/components/ui/collapsible.tsx(62,25): error TS2339: Property 'four' does not exist on type '{}'.
+src/components/ui/collapsible.tsx(63,22): error TS2339: Property 'four' does not exist on type '{}'.
+src/components/web-badge.tsx(33,22): error TS2339: Property 'five' does not exist on type '{}'.
+src/components/web-badge.tsx(35,18): error TS2339: Property 'two' does not exist on type '{}'.

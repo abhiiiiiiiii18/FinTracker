@@ -1,0 +1,8 @@
+src/app/split-detail.tsx(606,42): error TS2339: Property 'textSecondary' does not exist on type '{ bg: string; bgDeep: string; bgCard: string; bgGlass: string; bgCardAlt: string; gradientHero: readonly ["#1A0A3C", "#200D50", "#130730"]; gradientCard: readonly ["#111827", "#0D1424"]; gradientPrimary: readonly [...]; ... 31 more ...; borderSubtle: string; }'.
+src/components/hint-row.tsx(7,10): error TS2305: Module '"@/constants/theme"' has no exported member 'Spacing'.
+src/components/themed-text.tsx(3,10): error TS2305: Module '"@/constants/theme"' has no exported member 'Fonts'.
+src/components/themed-text.tsx(3,17): error TS2305: Module '"@/constants/theme"' has no exported member 'ThemeColor'.
+src/components/themed-view.tsx(3,10): error TS2305: Module '"@/constants/theme"' has no exported member 'ThemeColor'.
+src/components/ui/collapsible.tsx(8,10): error TS2305: Module '"@/constants/theme"' has no exported member 'Spacing'.
+src/components/web-badge.tsx(9,10): error TS2305: Module '"@/constants/theme"' has no exported member 'Spacing'.
+src/hooks/use-theme.ts(6,10): error TS2724: '"@/constants/theme"' has no exported member named 'Colors'. Did you mean 'colors'?

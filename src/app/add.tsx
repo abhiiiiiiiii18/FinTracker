@@ -1,86 +1,87 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, SafeAreaView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import React, { useState, useRef } from 'react';
+import {
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  ScrollView, SafeAreaView, KeyboardAvoidingView, Platform,
+  Alert, Animated,
+} from 'react-native';
 import { useFinanceStore, TransactionCategory } from '../store/useFinanceStore';
 import { useRouter } from 'expo-router';
-import { X } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
-
-const darkTheme = {
-  background: '#0F172A',
-  card: '#1E293B',
-  text: '#F8FAFC',
-  textSecondary: '#94A3B8',
-  primary: '#3B82F6',
-  accent: '#10B981',
-  danger: '#EF4444',
-  border: '#334155',
-  inputBg: '#0B1120',
-};
+import { colors, radius, shadow, CATEGORY_META } from '../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { CheckCircle2 } from 'lucide-react-native';
 
 const CATEGORIES: TransactionCategory[] = ['Food', 'Transport', 'Entertainment', 'Bills', 'Other'];
 
 export default function AddTransaction() {
   const router = useRouter();
   const { addTransaction, budget, transactions } = useFinanceStore();
-  
+
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<TransactionCategory>('Food');
   const [note, setNote] = useState('');
 
+  const btnScale = useRef(new Animated.Value(1)).current;
+
   const handleSave = async () => {
-    if (!amount || isNaN(Number(amount))) {
-      Alert.alert('Invalid Amount', 'Please enter a valid number.');
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount.');
       return;
     }
 
     const value = parseFloat(amount);
-    
-    // Quick Overspend Check Notification
+
     const currentMonthIdx = new Date().getMonth();
     const thisMonthTxs = transactions.filter(t => new Date(t.date).getMonth() === currentMonthIdx);
     const totalSpent = thisMonthTxs.reduce((sum, t) => sum + t.amount, 0);
-    
+
     if (totalSpent + value > budget.totalLimit) {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "🚨 Alert! Overspending",
-          body: `This transaction puts you over your monthly limit!`,
+          title: '🚨 Budget Alert',
+          body: 'This transaction puts you over your monthly limit!',
           sound: true,
         },
-        trigger: null, // Send immediately
+        trigger: null,
       });
     }
 
-    addTransaction({
-      amount: value,
-      category,
-      note,
+    // Animate press
+    Animated.sequence([
+      Animated.spring(btnScale, { toValue: 0.95, useNativeDriver: true }),
+      Animated.spring(btnScale, { toValue: 1, useNativeDriver: true }),
+    ]).start(() => {
+      addTransaction({ amount: value, category, note, source: 'manual' });
+      router.push('/');
     });
-
-    router.push('/');
   };
+
+  const meta = CATEGORY_META[category];
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+
+          {/* ── HEADER ───────────────────────────── */}
           <View style={styles.header}>
-            <Text style={styles.title}>New Expense</Text>
+            <Text style={styles.headerTitle}>New Expense</Text>
             <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-              <X color={darkTheme.textSecondary} size={24} />
+              <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.amountContainer}>
-            <Text style={styles.currency}>₹</Text>
+          {/* ── AMOUNT ENTRY ─────────────────────── */}
+          <View style={styles.amountSection}>
+            <LinearGradient
+              colors={[meta.bg, 'transparent']}
+              style={styles.amountGlow}
+            />
+            <Text style={styles.currencySymbol}>₹</Text>
             <TextInput
               style={styles.amountInput}
-              placeholder="0.00"
-              placeholderTextColor={darkTheme.textSecondary}
+              placeholder="0"
+              placeholderTextColor={colors.textFaint}
               keyboardType="decimal-pad"
               value={amount}
               onChangeText={setAmount}
@@ -88,40 +89,71 @@ export default function AddTransaction() {
             />
           </View>
 
-          <Text style={styles.label}>Category</Text>
+          {/* ── CATEGORY GRID ────────────────────── */}
+          <Text style={styles.sectionLabel}>CATEGORY</Text>
           <View style={styles.categoryGrid}>
-            {CATEGORIES.map(cat => (
-              <TouchableOpacity
-                key={cat}
-                style={[
-                  styles.categoryPill,
-                  category === cat && styles.categoryPillActive
-                ]}
-                onPress={() => setCategory(cat)}
-              >
-                <Text style={[
-                  styles.categoryText,
-                  category === cat && styles.categoryTextActive
-                ]}>
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {CATEGORIES.map(cat => {
+              const catMeta = CATEGORY_META[cat];
+              const isActive = category === cat;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  onPress={() => setCategory(cat)}
+                  activeOpacity={0.7}
+                  style={[
+                    styles.categoryCard,
+                    isActive && {
+                      borderColor: catMeta.color,
+                      backgroundColor: catMeta.bg,
+                    },
+                  ]}
+                >
+                  <View style={[styles.categoryEmojiBg, { backgroundColor: isActive ? catMeta.color + '30' : colors.bgCardAlt }]}>
+                    <Text style={styles.categoryEmoji}>{catMeta.emoji}</Text>
+                  </View>
+                  <Text style={[styles.categoryLabel, isActive && { color: catMeta.color }]}>
+                    {catMeta.label}
+                  </Text>
+                  {isActive && (
+                    <CheckCircle2 size={14} color={catMeta.color} style={styles.checkIcon} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          <Text style={styles.label}>Note (Optional)</Text>
-          <TextInput
-            style={styles.noteInput}
-            placeholder="What was this for?"
-            placeholderTextColor={darkTheme.border}
-            value={note}
-            onChangeText={setNote}
-            multiline
-          />
+          {/* ── NOTE INPUT ───────────────────────── */}
+          <Text style={styles.sectionLabel}>NOTE (OPTIONAL)</Text>
+          <View style={styles.noteWrapper}>
+            <TextInput
+              style={styles.noteInput}
+              placeholder="What was this for?"
+              placeholderTextColor={colors.textFaint}
+              value={note}
+              onChangeText={setNote}
+              multiline
+              numberOfLines={3}
+            />
+          </View>
 
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-            <Text style={styles.saveBtnText}>Save Transaction</Text>
-          </TouchableOpacity>
+          {/* ── SAVE BUTTON ──────────────────────── */}
+          <Animated.View style={{ transform: [{ scale: btnScale }] }}>
+            <TouchableOpacity onPress={handleSave} activeOpacity={0.85}>
+              <LinearGradient
+                colors={['#6D28D9', '#8B5CF6', '#7C3AED']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.saveBtn}
+              >
+                <Text style={styles.saveBtnText}>Save Expense</Text>
+                <View style={styles.saveBtnBadge}>
+                  <Text style={styles.saveBtnBadgeText}>
+                    {amount ? `₹${parseFloat(amount || '0').toFixed(2)}` : '₹0'}
+                  </Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -132,109 +164,170 @@ export default function AddTransaction() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: darkTheme.background,
+    backgroundColor: colors.bg,
   },
-  scrollContent: {
+  scroll: {
     padding: 24,
-    paddingTop: 40,
+    paddingTop: 48,
+    paddingBottom: 40,
   },
+
+  // ── Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 36,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: darkTheme.text,
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: colors.text,
+    letterSpacing: -0.5,
   },
   closeBtn: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: darkTheme.card,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.bgCard,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  amountContainer: {
+  closeBtnText: {
+    color: colors.textMuted,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  // ── Amount
+  amountSection: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 40,
-    borderBottomWidth: 2,
-    borderBottomColor: darkTheme.border,
-    paddingBottom: 16,
+    position: 'relative',
   },
-  currency: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: darkTheme.textSecondary,
-    marginRight: 8,
+  amountGlow: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    top: -50,
+    alignSelf: 'center',
+    opacity: 0.4,
+  },
+  currencySymbol: {
+    fontSize: 52,
+    fontWeight: '900',
+    color: colors.violet,
+    marginRight: 6,
+    marginTop: 8,
   },
   amountInput: {
-    fontSize: 56,
-    fontWeight: 'bold',
-    color: darkTheme.text,
-    minWidth: 150,
+    fontSize: 72,
+    fontWeight: '900',
+    color: colors.text,
+    letterSpacing: -2,
+    minWidth: 140,
+    textAlign: 'center',
   },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: darkTheme.textSecondary,
-    marginBottom: 16,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+
+  // ── Section Label
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textMuted,
+    letterSpacing: 2,
+    marginBottom: 14,
+    marginTop: 4,
   },
+
+  // ── Category Grid
   categoryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
     marginBottom: 32,
   },
-  categoryPill: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: darkTheme.card,
+  categoryCard: {
+    width: '30%',
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    position: 'relative',
+  },
+  categoryEmojiBg: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  categoryEmoji: {
+    fontSize: 22,
+  },
+  categoryLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  checkIcon: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+  },
+
+  // ── Note Input
+  noteWrapper: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: darkTheme.border,
-  },
-  categoryPillActive: {
-    backgroundColor: darkTheme.primary,
-    borderColor: darkTheme.primary,
-  },
-  categoryText: {
-    color: darkTheme.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  categoryTextActive: {
-    color: darkTheme.text,
+    borderColor: colors.border,
+    marginBottom: 32,
+    overflow: 'hidden',
   },
   noteInput: {
-    backgroundColor: darkTheme.inputBg,
-    borderRadius: 16,
     padding: 16,
-    color: darkTheme.text,
-    fontSize: 16,
-    minHeight: 100,
+    color: colors.text,
+    fontSize: 15,
+    minHeight: 90,
     textAlignVertical: 'top',
-    marginBottom: 40,
-    borderWidth: 1,
-    borderColor: darkTheme.border,
+    lineHeight: 22,
   },
+
+  // ── Save Button
   saveBtn: {
-    backgroundColor: darkTheme.accent,
-    borderRadius: 20,
-    padding: 18,
+    borderRadius: radius.pill,
+    paddingVertical: 18,
+    paddingHorizontal: 28,
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: darkTheme.accent,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
+    justifyContent: 'center',
+    gap: 12,
+    ...shadow.violet,
   },
   saveBtnText: {
-    color: darkTheme.text,
-    fontSize: 18,
-    fontWeight: 'bold',
-  }
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  saveBtnBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  saveBtnBadgeText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });

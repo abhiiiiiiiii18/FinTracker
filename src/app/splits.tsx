@@ -11,26 +11,15 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Users, Plus, Trash2, ChevronRight, X, UserPlus, BookUser } from 'lucide-react-native';
 import * as Contacts from 'expo-contacts';
 import { useSplitStore, computeNetBalances, simplifyDebts, GroupInvitation } from '../store/useSplitStore';
 import type { Group } from '../store/useSplitStore';
-
-const theme = {
-  background: '#0F172A',
-  card: '#1E293B',
-  cardAlt: '#162032',
-  text: '#F8FAFC',
-  textSecondary: '#94A3B8',
-  primary: '#3B82F6',
-  accent: '#10B981',
-  danger: '#EF4444',
-  warning: '#F59E0B',
-  border: '#334155',
-  inputBg: '#0F172A',
-};
+import { colors, radius, shadow } from '../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // ─── Group list item ──────────────────────────────────────────────────────────
 
@@ -40,28 +29,166 @@ function GroupCard({ group, onPress, onDelete }: { group: Group; onPress: () => 
 
   return (
     <TouchableOpacity style={styles.groupCard} onPress={onPress} activeOpacity={0.8}>
-      <View style={styles.groupIcon}>
-        <Users color={theme.primary} size={22} />
-      </View>
+      <LinearGradient
+        colors={['#4C1D95', '#6D28D9', '#7C3AED']}
+        style={styles.groupIcon}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <Users color="#fff" size={20} />
+      </LinearGradient>
       <View style={styles.groupInfo}>
         <Text style={styles.groupName}>{group.name}</Text>
         <Text style={styles.groupMeta}>
           {group.members.length} members · {group.expenses.length} expenses
         </Text>
         {totalOwed > 0 && (
-          <Text style={styles.groupDebt}>₹{totalOwed.toFixed(0)} unsettled</Text>
+          <View style={styles.debtBadge}>
+            <Text style={styles.groupDebt}>₹{totalOwed.toFixed(0)} unsettled</Text>
+          </View>
         )}
         {totalOwed === 0 && group.expenses.length > 0 && (
-          <Text style={styles.groupSettled}>✓ All settled</Text>
+          <View style={styles.settledBadge}>
+            <Text style={styles.groupSettled}>✓ All settled</Text>
+          </View>
         )}
       </View>
       <View style={styles.groupActions}>
         <TouchableOpacity onPress={onDelete} style={styles.deleteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Trash2 color={theme.danger} size={16} />
+          <Trash2 color={colors.rose} size={18} />
         </TouchableOpacity>
-        <ChevronRight color={theme.textSecondary} size={20} />
+        <ChevronRight color={colors.borderBright} size={20} />
       </View>
     </TouchableOpacity>
+  );
+}
+
+// ─── Multi-select Contacts Picker ────────────────────────────────────────────
+
+function ContactsPickerModal({
+  visible, onClose, onSelect, alreadyAdded,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (names: string[]) => void;
+  alreadyAdded: string[];
+}) {
+  const [allContacts, setAllContacts] = useState<string[]>([]);
+  const [filtered, setFiltered] = useState<string[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    (async () => {
+      setLoading(true);
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Allow contacts access to pick friends.');
+        onClose();
+        return;
+      }
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.Name, Contacts.Fields.FirstName, Contacts.Fields.LastName],
+        sort: Contacts.SortTypes.FirstName,
+      });
+      const names = (data || [])
+        .map((c) => {
+          if (c.name?.trim()) return c.name.trim();
+          const parts = [c.firstName, c.lastName].filter(Boolean);
+          return parts.length > 0 ? parts.join(' ') : null;
+        })
+        .filter(Boolean) as string[];
+      setAllContacts(names);
+      setFiltered(names);
+      setLoading(false);
+    })();
+  }, [visible]);
+
+  useEffect(() => {
+    const q = search.toLowerCase();
+    setFiltered(q ? allContacts.filter((n) => n.toLowerCase().includes(q)) : allContacts);
+  }, [search, allContacts]);
+
+  const toggle = (name: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  };
+
+  const handleDone = () => {
+    onSelect(Array.from(selected));
+    setSelected(new Set());
+    setSearch('');
+    onClose();
+  };
+
+  const handleClose = () => {
+    setSelected(new Set());
+    setSearch('');
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
+      <View style={styles.cpContainer}>
+        <View style={styles.cpHeader}>
+          <TouchableOpacity onPress={handleClose} style={styles.cpCloseBtn}>
+            <X color={colors.textMuted} size={22} />
+          </TouchableOpacity>
+          <Text style={styles.cpTitle}>Select Members</Text>
+          <TouchableOpacity
+            style={[styles.cpDoneBtn, selected.size === 0 && styles.cpDoneBtnDisabled]}
+            onPress={handleDone}
+            disabled={selected.size === 0}
+          >
+            <Text style={styles.cpDoneText}>
+              Add{selected.size > 0 ? ` (${selected.size})` : ''}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.cpSearchRow}>
+          <TextInput
+            style={styles.cpSearch}
+            placeholder="Search contacts…"
+            placeholderTextColor={colors.textFaint}
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
+
+        {loading ? (
+          <ActivityIndicator color={colors.violet} style={{ marginTop: 60 }} />
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => item}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            renderItem={({ item }) => {
+              const isSelected = selected.has(item);
+              const isDisabled = alreadyAdded.includes(item);
+              return (
+                <Pressable
+                  style={[styles.cpRow, isSelected && styles.cpRowSelected]}
+                  onPress={() => !isDisabled && toggle(item)}
+                >
+                  <View style={[styles.cpCheckbox, isSelected && styles.cpCheckboxSelected]}>
+                    {isSelected && <Text style={styles.cpCheckmark}>✓</Text>}
+                  </View>
+                  <Text style={[styles.cpName, isDisabled && { color: colors.textMuted }]}>
+                    {item}{isDisabled ? ' (added)' : ''}
+                  </Text>
+                </Pressable>
+              );
+            }}
+          />
+        )}
+      </View>
+    </Modal>
   );
 }
 
@@ -73,6 +200,7 @@ function NewGroupModal({ visible, onClose }: { visible: boolean; onClose: () => 
   const [memberInput, setMemberInput] = useState('');
   const [members, setMembers] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [contactsPickerVisible, setContactsPickerVisible] = useState(false);
 
   const addMember = () => {
     const trimmed = memberInput.trim();
@@ -85,30 +213,11 @@ function NewGroupModal({ visible, onClose }: { visible: boolean; onClose: () => 
     setMemberInput('');
   };
 
-  const pickFromContacts = async () => {
-    const { status } = await Contacts.requestPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Allow contacts access to pick friends easily.');
-      return;
-    }
+  const pickFromContacts = () => setContactsPickerVisible(true);
 
-    const contact = await Contacts.presentContactPickerAsync();
-    if (!contact) return;
-
-    const name = contact.name?.trim() ||
-      [contact.firstName, contact.lastName].filter(Boolean).join(' ');
-
-    if (!name) {
-      Alert.alert('No Name', 'This contact has no name saved.');
-      return;
-    }
-
-    if (members.includes(name)) {
-      Alert.alert('Already added', `${name} is already in the group.`);
-      return;
-    }
-
-    setMembers((prev) => [...prev, name]);
+  const handleContactsSelected = (names: string[]) => {
+    const newOnes = names.filter((n) => !members.includes(n));
+    if (newOnes.length > 0) setMembers((prev) => [...prev, ...newOnes]);
   };
 
   const handleCreate = async () => {
@@ -122,67 +231,82 @@ function NewGroupModal({ visible, onClose }: { visible: boolean; onClose: () => 
     onClose();
   };
 
-  const reset = () => { setName(''); setMemberInput(''); setMembers([]); onClose(); };
+  const reset = () => { setName(''); setMemberInput(''); setMembers([]); setContactsPickerVisible(false); onClose(); };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={reset}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>New Group</Text>
-            <TouchableOpacity onPress={reset}><X color={theme.textSecondary} size={22} /></TouchableOpacity>
-          </View>
-
-          <Text style={styles.inputLabel}>Group Name</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. Goa Trip, Flatmates"
-            placeholderTextColor={theme.textSecondary}
-            value={name}
-            onChangeText={setName}
-          />
-
-          <Text style={styles.inputLabel}>Add Members</Text>
-          <View style={styles.memberInputRow}>
-            <TextInput
-              style={[styles.input, { flex: 1, marginBottom: 0 }]}
-              placeholder="Enter name"
-              placeholderTextColor={theme.textSecondary}
-              value={memberInput}
-              onChangeText={setMemberInput}
-              onSubmitEditing={addMember}
-              returnKeyType="done"
-            />
-            <TouchableOpacity style={styles.addMemberBtn} onPress={addMember}>
-              <UserPlus color={theme.primary} size={20} />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.addMemberBtn, { backgroundColor: '#1A3D2B' }]} onPress={pickFromContacts}>
-              <BookUser color={theme.accent} size={20} />
-            </TouchableOpacity>
-          </View>
-
-          {members.length > 0 && (
-            <View style={styles.memberChips}>
-              {members.map((m) => (
-                <TouchableOpacity
-                  key={m}
-                  style={styles.chip}
-                  onPress={() => setMembers((prev) => prev.filter((x) => x !== m))}
-                >
-                  <Text style={styles.chipText}>{m}</Text>
-                  <X color={theme.textSecondary} size={12} />
-                </TouchableOpacity>
-              ))}
+    <>
+      <Modal visible={visible} animationType="slide" transparent onRequestClose={reset}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>New Group</Text>
+              <TouchableOpacity onPress={reset} style={styles.modalCloseBtn}><X color={colors.textMuted} size={20} /></TouchableOpacity>
             </View>
-          )}
-          <Text style={styles.hintText}>Tap a name to remove it</Text>
 
-          <TouchableOpacity style={styles.createBtn} onPress={handleCreate} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.createBtnText}>Create Group</Text>}
-          </TouchableOpacity>
+            <Text style={styles.inputLabel}>Group Name</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Goa Trip, Flatmates"
+              placeholderTextColor={colors.textFaint}
+              value={name}
+              onChangeText={setName}
+            />
+
+            <Text style={styles.inputLabel}>Add Members</Text>
+            <View style={styles.memberInputRow}>
+              <TextInput
+                style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                placeholder="Enter name"
+                placeholderTextColor={colors.textFaint}
+                value={memberInput}
+                onChangeText={setMemberInput}
+                onSubmitEditing={addMember}
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={styles.addMemberBtn} onPress={addMember}>
+                <UserPlus color={colors.violet} size={20} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.addMemberBtn, { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)' }]} onPress={pickFromContacts}>
+                <BookUser color={colors.mint} size={20} />
+              </TouchableOpacity>
+            </View>
+
+            {members.length > 0 && (
+              <View style={styles.memberChips}>
+                {members.map((m) => (
+                  <TouchableOpacity
+                    key={m}
+                    style={styles.chip}
+                    onPress={() => setMembers((prev) => prev.filter((x) => x !== m))}
+                  >
+                    <Text style={styles.chipText}>{m}</Text>
+                    <X color={colors.textMuted} size={12} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <Text style={styles.hintText}>Tap a name to remove it</Text>
+
+            <TouchableOpacity onPress={handleCreate} disabled={loading} activeOpacity={0.8}>
+               <LinearGradient
+                  colors={['#6D28D9', '#8B5CF6']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.createBtn}
+               >
+                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.createBtnText}>Create Group</Text>}
+               </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+      <ContactsPickerModal
+        visible={contactsPickerVisible}
+        onClose={() => setContactsPickerVisible(false)}
+        onSelect={handleContactsSelected}
+        alreadyAdded={members}
+      />
+    </>
   );
 }
 
@@ -225,7 +349,7 @@ export default function SplitsScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Bill Splits</Text>
         <TouchableOpacity style={styles.newGroupBtn} onPress={() => setModalVisible(true)}>
-          <Plus color="#fff" size={20} />
+          <Plus color="#fff" size={18} />
           <Text style={styles.newGroupBtnText}>New Group</Text>
         </TouchableOpacity>
       </View>
@@ -244,10 +368,12 @@ export default function SplitsScreen() {
       )}
 
       {!isLoaded ? (
-        <ActivityIndicator color={theme.primary} style={{ marginTop: 60 }} />
+        <ActivityIndicator color={colors.violet} style={{ marginTop: 60 }} />
       ) : groups.length === 0 ? (
         <View style={styles.emptyState}>
-          <Users color={theme.border} size={56} />
+          <View style={styles.emptyIconWrap}>
+             <Users color={colors.violet} size={48} />
+          </View>
           <Text style={styles.emptyTitle}>No groups yet</Text>
           <Text style={styles.emptySubtitle}>Create a group to start splitting bills with friends.</Text>
         </View>
@@ -274,114 +400,158 @@ export default function SplitsScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.background },
+  container: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 40,
-    paddingBottom: 16,
+    paddingHorizontal: 24,
+    paddingTop: 48,
+    paddingBottom: 24,
   },
-  title: { fontSize: 28, fontWeight: '900', color: theme.text },
+  title: { fontSize: 32, fontWeight: '900', color: colors.text, letterSpacing: -1 },
   newGroupBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: colors.violet,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
     gap: 6,
+    ...shadow.violet,
   },
-  newGroupBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  list: { paddingHorizontal: 20, paddingBottom: 100 },
+  newGroupBtnText: { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 },
+  list: { paddingHorizontal: 20, paddingBottom: 110 },
   groupCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.card,
-    borderRadius: 18,
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.xl,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: colors.border,
+    ...shadow.card,
   },
   groupIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#1D3461',
+    width: 52,
+    height: 52,
+    borderRadius: radius.lg,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+    marginRight: 16,
   },
   groupInfo: { flex: 1 },
-  groupName: { fontSize: 17, fontWeight: '700', color: theme.text, marginBottom: 3 },
-  groupMeta: { fontSize: 12, color: theme.textSecondary },
-  groupDebt: { fontSize: 12, color: theme.warning, marginTop: 4, fontWeight: '600' },
-  groupSettled: { fontSize: 12, color: theme.accent, marginTop: 4, fontWeight: '600' },
-  groupActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  groupName: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 4 },
+  groupMeta: { fontSize: 13, color: colors.textMuted },
+  debtBadge: { alignSelf: 'flex-start', backgroundColor: colors.amberGlow, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 8 },
+  groupDebt: { fontSize: 12, color: colors.amber, fontWeight: '700' },
+  settledBadge: { alignSelf: 'flex-start', backgroundColor: colors.mintGlow, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 8 },
+  groupSettled: { fontSize: 12, color: colors.mint, fontWeight: '700' },
+  groupActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   deleteBtn: { padding: 4 },
-  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: theme.text, marginTop: 20 },
-  emptySubtitle: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 22 },
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, marginTop: -80 },
+  emptyIconWrap: { width: 90, height: 90, borderRadius: 45, backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
+  emptyTitle: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
+  emptySubtitle: { fontSize: 15, color: colors.textMuted, textAlign: 'center', marginTop: 8, lineHeight: 22 },
+  
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(5, 7, 18, 0.8)', justifyContent: 'flex-end' },
   modalSheet: {
-    backgroundColor: theme.card,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    backgroundColor: colors.bgCard,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     padding: 24,
     paddingBottom: 40,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderBottomWidth: 0,
   },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  modalTitle: { fontSize: 22, fontWeight: '800', color: theme.text },
-  inputLabel: { fontSize: 13, fontWeight: '600', color: theme.textSecondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  modalTitle: { fontSize: 24, fontWeight: '900', color: colors.text, letterSpacing: -0.5 },
+  modalCloseBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.bgDeep, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  inputLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1.5 },
   input: {
-    backgroundColor: theme.inputBg,
-    borderRadius: 12,
-    padding: 14,
-    color: theme.text,
+    backgroundColor: colors.bgDeep,
+    borderRadius: radius.md,
+    padding: 16,
+    color: colors.text,
     fontSize: 15,
     borderWidth: 1,
-    borderColor: theme.border,
-    marginBottom: 16,
+    borderColor: colors.border,
+    marginBottom: 20,
   },
   memberInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   addMemberBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#1D3461',
+    width: 52,
+    height: 52,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
-  memberChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  memberChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E3A5F',
+    backgroundColor: colors.bgDeep,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
     gap: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  chipText: { color: theme.primary, fontSize: 13, fontWeight: '600' },
-  hintText: { fontSize: 11, color: theme.textSecondary, marginBottom: 24 },
+  chipText: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  hintText: { fontSize: 12, color: colors.textFaint, marginBottom: 28 },
   createBtn: {
-    backgroundColor: theme.primary,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: radius.pill,
+    padding: 18,
     alignItems: 'center',
     marginTop: 8,
+    ...shadow.violet,
   },
   createBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  
   // Invite banner
   inviteBanner: {
-    marginHorizontal: 20, marginBottom: 12, backgroundColor: '#1A2F1A',
-    borderRadius: 14, padding: 14, borderWidth: 1, borderColor: theme.accent,
+    marginHorizontal: 20, marginBottom: 16, backgroundColor: colors.mintGlow,
+    borderRadius: radius.md, padding: 16, borderWidth: 1, borderColor: colors.borderMint,
   },
-  inviteBannerTitle: { color: theme.accent, fontWeight: '700', fontSize: 14, marginBottom: 8 },
-  inviteRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
-  inviteText: { color: theme.text, fontSize: 13 },
-  inviteAccept: { color: theme.accent, fontWeight: '700', fontSize: 13 },
+  inviteBannerTitle: { color: colors.mint, fontWeight: '800', fontSize: 15, marginBottom: 8 },
+  inviteRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
+  inviteText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  inviteAccept: { color: colors.mint, fontWeight: '800', fontSize: 14 },
+  
+  // Contacts picker
+  cpContainer: { flex: 1, backgroundColor: colors.bg },
+  cpHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 60, paddingBottom: 16,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  cpCloseBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.bgCard, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  cpTitle: { fontSize: 20, fontWeight: '800', color: colors.text },
+  cpDoneBtn: { backgroundColor: colors.violet, borderRadius: radius.pill, paddingHorizontal: 20, paddingVertical: 10 },
+  cpDoneBtnDisabled: { backgroundColor: colors.borderBright },
+  cpDoneText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  cpSearchRow: { paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
+  cpSearch: {
+    backgroundColor: colors.bgCardAlt, borderRadius: radius.pill, paddingHorizontal: 20, paddingVertical: 14,
+    color: colors.text, fontSize: 15, borderWidth: 1, borderColor: colors.border,
+  },
+  cpRow: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16,
+    borderBottomWidth: 1, borderBottomColor: colors.borderSubtle,
+  },
+  cpRowSelected: { backgroundColor: 'rgba(139, 92, 246, 0.08)' },
+  cpCheckbox: {
+    width: 24, height: 24, borderRadius: 8, borderWidth: 2, borderColor: colors.textMuted,
+    marginRight: 16, justifyContent: 'center', alignItems: 'center',
+  },
+  cpCheckboxSelected: { backgroundColor: colors.violet, borderColor: colors.violet },
+  cpCheckmark: { color: '#fff', fontSize: 14, fontWeight: '900' },
+  cpName: { fontSize: 16, color: colors.text, fontWeight: '600' },
 });
