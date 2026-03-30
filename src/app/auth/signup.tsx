@@ -1,67 +1,104 @@
-import React, { useState } from 'react';
+import { useRouter } from "expo-router";
+import { ArrowRight, Lock, Mail, TrendingUp, User } from "lucide-react-native";
+import React, { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { Mail, Lock, User, ArrowRight, TrendingUp } from 'lucide-react-native';
-import { useAuthStore } from '../../store/useAuthStore';
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { useAuthStore } from "../../store/useAuthStore";
 
 const theme = {
-  background: '#0F172A',
-  card: '#1E293B',
-  text: '#F8FAFC',
-  textSecondary: '#94A3B8',
-  primary: '#3B82F6',
-  accent: '#10B981',
-  danger: '#EF4444',
-  border: '#334155',
-  inputBg: '#0A1628',
+  background: "#0F172A",
+  card: "#1E293B",
+  text: "#F8FAFC",
+  textSecondary: "#94A3B8",
+  primary: "#3B82F6",
+  accent: "#10B981",
+  danger: "#EF4444",
+  border: "#334155",
+  inputBg: "#0A1628",
+};
+
+// Validate password strength: min 10 chars, requires uppercase, number, special char
+const validatePassword = (pwd: string): string | null => {
+  if (pwd.length < 10) {
+    return "Password must be at least 10 characters.";
+  }
+  if (!/[A-Z]/.test(pwd)) {
+    return "Password must contain at least one uppercase letter.";
+  }
+  if (!/[0-9]/.test(pwd)) {
+    return "Password must contain at least one number.";
+  }
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) {
+    return "Password must contain at least one special character (!@#$%^&* etc).";
+  }
+  return null;
 };
 
 export default function SignupScreen() {
   const router = useRouter();
   const { signUp, isLoading } = useAuthStore();
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const handleSignup = async () => {
-    if (!fullName.trim()) { Alert.alert('Missing', 'Please enter your full name.'); return; }
-    if (!email.trim()) { Alert.alert('Missing', 'Please enter your email.'); return; }
-    if (password.length < 6) { Alert.alert('Weak Password', 'Password must be at least 6 characters.'); return; }
-    if (password !== confirmPassword) { Alert.alert('Mismatch', 'Passwords do not match.'); return; }
+    if (!fullName.trim()) {
+      Alert.alert("Missing", "Please enter your full name.");
+      return;
+    }
+    if (!email.trim()) {
+      Alert.alert("Missing", "Please enter your email.");
+      return;
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      Alert.alert("Weak Password", passwordError);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("Mismatch", "Passwords do not match.");
+      return;
+    }
 
     const error = await signUp(email.trim(), password, fullName.trim());
     if (error) {
-      Alert.alert('Sign Up Failed', error);
+      Alert.alert("Sign Up Failed", error);
       return;
     }
 
     Alert.alert(
-      '✅ Almost there!',
-      'We sent a confirmation email to ' + email + '. Please verify your email then log in.',
-      [{ text: 'Go to Login', onPress: () => router.replace('/auth/login') }]
+      "✅ Almost there!",
+      "We sent a confirmation email to " +
+        email +
+        ". Please verify your email then log in.",
+      [{ text: "Go to Login", onPress: () => router.replace("/auth/login") }],
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Logo */}
           <View style={styles.logoWrapper}>
             <View style={styles.logoIcon}>
@@ -75,7 +112,11 @@ export default function SignupScreen() {
 
           {/* Full Name */}
           <View style={styles.inputWrapper}>
-            <User color={theme.textSecondary} size={18} style={styles.inputIcon} />
+            <User
+              color={theme.textSecondary}
+              size={18}
+              style={styles.inputIcon}
+            />
             <TextInput
               style={styles.input}
               placeholder="Full Name"
@@ -89,7 +130,11 @@ export default function SignupScreen() {
 
           {/* Email */}
           <View style={styles.inputWrapper}>
-            <Mail color={theme.textSecondary} size={18} style={styles.inputIcon} />
+            <Mail
+              color={theme.textSecondary}
+              size={18}
+              style={styles.inputIcon}
+            />
             <TextInput
               style={styles.input}
               placeholder="Email Address"
@@ -104,10 +149,14 @@ export default function SignupScreen() {
 
           {/* Password */}
           <View style={styles.inputWrapper}>
-            <Lock color={theme.textSecondary} size={18} style={styles.inputIcon} />
+            <Lock
+              color={theme.textSecondary}
+              size={18}
+              style={styles.inputIcon}
+            />
             <TextInput
               style={styles.input}
-              placeholder="Password (min. 6 chars)"
+              placeholder="Password (min. 10 chars, uppercase, number, special)"
               placeholderTextColor={theme.textSecondary}
               value={password}
               onChangeText={setPassword}
@@ -118,7 +167,11 @@ export default function SignupScreen() {
 
           {/* Confirm Password */}
           <View style={styles.inputWrapper}>
-            <Lock color={theme.textSecondary} size={18} style={styles.inputIcon} />
+            <Lock
+              color={theme.textSecondary}
+              size={18}
+              style={styles.inputIcon}
+            />
             <TextInput
               style={styles.input}
               placeholder="Confirm Password"
@@ -132,7 +185,11 @@ export default function SignupScreen() {
           </View>
 
           {/* Sign Up Button */}
-          <TouchableOpacity style={styles.primaryBtn} onPress={handleSignup} disabled={isLoading}>
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={handleSignup}
+            disabled={isLoading}
+          >
             {isLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
@@ -146,7 +203,7 @@ export default function SignupScreen() {
           {/* Login Link */}
           <View style={styles.switchRow}>
             <Text style={styles.switchText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => router.replace('/auth/login')}>
+            <TouchableOpacity onPress={() => router.replace("/auth/login")}>
               <Text style={styles.switchLink}>Log In</Text>
             </TouchableOpacity>
           </View>
@@ -159,34 +216,63 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
   content: { padding: 24, paddingTop: 48, paddingBottom: 60 },
-  logoWrapper: { alignItems: 'center', marginBottom: 40 },
+  logoWrapper: { alignItems: "center", marginBottom: 40 },
   logoIcon: {
-    width: 72, height: 72, borderRadius: 24,
-    backgroundColor: '#1D3461', justifyContent: 'center', alignItems: 'center',
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    backgroundColor: "#1D3461",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 12,
-    shadowColor: theme.primary, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4, shadowRadius: 16, elevation: 10,
+    shadowColor: theme.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
   },
-  appName: { fontSize: 28, fontWeight: '900', color: theme.text, letterSpacing: -0.5 },
+  appName: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: theme.text,
+    letterSpacing: -0.5,
+  },
   tagline: { fontSize: 14, color: theme.textSecondary, marginTop: 4 },
-  title: { fontSize: 22, fontWeight: '800', color: theme.text, marginBottom: 24 },
+  title: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: theme.text,
+    marginBottom: 24,
+  },
   inputWrapper: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: theme.inputBg, borderRadius: 14,
-    borderWidth: 1, borderColor: theme.border,
-    paddingHorizontal: 14, marginBottom: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.inputBg,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingHorizontal: 14,
+    marginBottom: 14,
   },
   inputIcon: { marginRight: 10 },
   input: { flex: 1, color: theme.text, fontSize: 15, paddingVertical: 16 },
   primaryBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: theme.primary, borderRadius: 16,
-    paddingVertical: 16, gap: 8, marginTop: 8,
-    shadowColor: theme.primary, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4, shadowRadius: 16, elevation: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.primary,
+    borderRadius: 16,
+    paddingVertical: 16,
+    gap: 8,
+    marginTop: 8,
+    shadowColor: theme.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  primaryBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
-  switchRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
+  primaryBtnText: { color: "#fff", fontSize: 17, fontWeight: "800" },
+  switchRow: { flexDirection: "row", justifyContent: "center", marginTop: 24 },
   switchText: { color: theme.textSecondary, fontSize: 14 },
-  switchLink: { color: theme.primary, fontSize: 14, fontWeight: '700' },
+  switchLink: { color: theme.primary, fontSize: 14, fontWeight: "700" },
 });
