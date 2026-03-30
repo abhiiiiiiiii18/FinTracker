@@ -217,7 +217,6 @@ export default function TabLayout() {
       <Tabs.Screen name="budget" options={{ title: 'Budget' }} />
       <Tabs.Screen name="split-detail" options={{ href: null }} />
       <Tabs.Screen name="auth"   options={{ href: null }} />
-      <Tabs.Screen name="explore" options={{ href: null }} />
     </Tabs>
   );
 }

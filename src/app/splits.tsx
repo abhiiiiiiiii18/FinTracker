@@ -100,8 +100,10 @@ function ContactsPickerModal({
           return parts.length > 0 ? parts.join(' ') : null;
         })
         .filter(Boolean) as string[];
-      setAllContacts(names);
-      setFiltered(names);
+        
+      const uniqueNames = Array.from(new Set(names));
+      setAllContacts(uniqueNames);
+      setFiltered(uniqueNames);
       setLoading(false);
     })();
   }, [visible]);

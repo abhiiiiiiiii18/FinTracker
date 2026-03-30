@@ -48,9 +48,15 @@ export async function registerForPushNotifications(): Promise<string | null> {
     return null;
   }
 
-  const tokenData = await Notifications.getExpoPushTokenAsync({
-    projectId: '9bac4c49-8543-4587-b675-d914c700a2ed',
-  });
+  let tokenData;
+  try {
+    tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: '9bac4c49-8543-4587-b675-d914c700a2ed',
+    });
+  } catch (err) {
+    console.warn('[Notifications] Push token fetch failed (requires Firebase setup):', err);
+    return null;
+  }
 
   console.log('[Notifications] Token:', tokenData.data);
   return tokenData.data;

@@ -23,7 +23,8 @@
         "android.permission.READ_SMS",
         "android.permission.RECEIVE_SMS"
       ],
-      "package": "com.abhi_nischal.FinTracker"
+      "package": "com.abhi_nischal.FinTracker",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
