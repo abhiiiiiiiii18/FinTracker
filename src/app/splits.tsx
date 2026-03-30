@@ -92,18 +92,28 @@ function NewGroupModal({ visible, onClose }: { visible: boolean; onClose: () => 
       return;
     }
     const { data } = await Contacts.getContactsAsync({
-      fields: [Contacts.Fields.Name],
+      fields: [Contacts.Fields.Name, Contacts.Fields.FirstName, Contacts.Fields.LastName],
       sort: Contacts.SortTypes.FirstName,
     });
     if (!data || data.length === 0) {
       Alert.alert('No Contacts', 'No contacts found on this device.');
       return;
     }
-    // Show a simple alert list — for a proper picker UX we show top 20 contacts
+
+    // Build name from firstName + lastName if name is missing
     const names = data
-      .filter((c: Contacts.Contact) => c.name)
-      .slice(0, 20)
-      .map((c: Contacts.Contact) => c.name as string);
+      .map((c: Contacts.Contact) => {
+        if (c.name && c.name.trim()) return c.name.trim();
+        const parts = [c.firstName, c.lastName].filter(Boolean);
+        return parts.length > 0 ? parts.join(' ') : null;
+      })
+      .filter(Boolean)
+      .slice(0, 20) as string[];
+
+    if (names.length === 0) {
+      Alert.alert('No Contacts', 'Could not read contact names.');
+      return;
+    }
 
     Alert.alert(
       'Pick a Contact',
