@@ -8,7 +8,8 @@ export type TransactionCategory =
   | "Transport"
   | "Entertainment"
   | "Bills"
-  | "Other";
+  | "Other"
+  | (string & {});
 
 export interface Transaction {
   id: string;
@@ -248,7 +249,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
 
     Object.entries(categorySpending).forEach(([cat, amount]) => {
       const limit = budget.categoryLimits[cat as TransactionCategory] || 0;
-      if (limit > 0 && amount > limit) {
+      if (limit > 0 && amount !== undefined && amount > limit) {
         insights.push(
           `💡 Suggestion: You overspent on ${cat}. Try cooking at home or finding free alternatives this week.`,
         );

@@ -4,21 +4,30 @@ import {
   TouchableOpacity, TextInput, Dimensions,
 } from 'react-native';
 import { useFinanceStore, TransactionCategory } from '../store/useFinanceStore';
-import { colors, radius, shadow, CATEGORY_META } from '../constants/theme';
+import { colors, radius, shadow, getCategoryMeta } from '../constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Target, Edit3, TrendingDown, Award } from 'lucide-react-native';
+import { Target, Edit3, TrendingDown, Award, Check, Trash2 } from 'lucide-react-native';
 
 const { width: W } = Dimensions.get('window');
 
-const CATEGORIES: TransactionCategory[] = ['Food', 'Transport', 'Entertainment', 'Bills', 'Other'];
+const PREDEFINED_CATEGORIES = ['Food', 'Transport', 'Entertainment', 'Bills', 'Other'];
 
 // ─── CATEGORY BAR ──────────────────────────────────────────────────────────
 const CategoryBar = ({
-  cat, amount, total, limit,
-}: { cat: TransactionCategory; amount: number; total: number; limit: number }) => {
-  const meta = CATEGORY_META[cat];
+  cat, amount, total, limit, onUpdateLimit
+}: { cat: string; amount: number; total: number; limit: number; onUpdateLimit: (cat: string, newLimit: number) => void }) => {
+  const meta = getCategoryMeta(cat);
   const pct = total > 0 ? Math.min((amount / total) * 100, 100) : 0;
   const overLimit = limit > 0 && amount > limit;
+
+  const [editing, setEditing] = useState(false);
+  const [editLimit, setEditLimit] = useState(limit > 0 ? limit.toString() : '');
+
+  const handleSave = () => {
+    const val = parseFloat(editLimit);
+    onUpdateLimit(cat, !isNaN(val) && val >= 0 ? val : 0);
+    setEditing(false);
+  };
 
   return (
     <View style={catStyles.row}>
@@ -28,10 +37,41 @@ const CategoryBar = ({
       <View style={catStyles.info}>
         <View style={catStyles.labelRow}>
           <Text style={catStyles.name}>{meta.label}</Text>
-          <Text style={[catStyles.amount, { color: overLimit ? colors.rose : colors.text }]}>
-            ₹{amount.toFixed(0)}
-            {limit > 0 && <Text style={catStyles.limit}> / ₹{limit}</Text>}
-          </Text>
+          {editing ? (
+             <View style={catStyles.editRow}>
+               <Text style={catStyles.rupee}>₹</Text>
+               <TextInput
+                 style={catStyles.limitInput}
+                 value={editLimit}
+                 onChangeText={setEditLimit}
+                 keyboardType="decimal-pad"
+                 autoFocus
+                 onSubmitEditing={handleSave}
+               />
+               <TouchableOpacity onPress={handleSave} style={catStyles.saveBtn}>
+                 <Check size={14} color="#FFF" />
+               </TouchableOpacity>
+             </View>
+          ) : (
+            <View style={catStyles.displayLimitContainer}>
+              <TouchableOpacity onPress={() => setEditing(true)} activeOpacity={0.7} style={catStyles.displayLimitRow} hitSlop={{top:10, bottom:10, left:10, right:10}}>
+                <Text style={[catStyles.amount, { color: overLimit ? colors.rose : colors.text }]}>
+                  ₹{amount.toFixed(0)}
+                </Text>
+                <Text style={[catStyles.limit, limit === 0 && {color: colors.violet}]}>
+                  {limit > 0 ? ` / ₹${limit}` : ' (Set Limit)'}
+                </Text>
+                <View style={{padding: 4, marginLeft: 6}}>
+                  <Edit3 size={16} color={colors.violet} />
+                </View>
+              </TouchableOpacity>
+              {limit > 0 && (
+                <TouchableOpacity onPress={() => onUpdateLimit(cat, 0)} style={{marginLeft: 8, padding: 4}} hitSlop={{top:10, bottom:10, left:10, right:10}}>
+                  <Trash2 size={18} color={colors.rose} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
         <View style={catStyles.track}>
           <View style={[catStyles.fill, {
@@ -52,7 +92,23 @@ const catStyles = StyleSheet.create({
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   name: { fontSize: 14, fontWeight: '700', color: colors.text },
   amount: { fontSize: 14, fontWeight: '800' },
-  limit: { fontSize: 12, color: colors.textMuted, fontWeight: '400' },
+  limit: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
+  displayLimitContainer: { flexDirection: 'row', alignItems: 'center' },
+  displayLimitRow: { flexDirection: 'row', alignItems: 'center' },
+  editRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  rupee: { fontSize: 13, color: colors.textMuted, fontWeight: '700' },
+  limitInput: {
+    fontSize: 14, fontWeight: '700', color: colors.text,
+    minWidth: 40, borderBottomWidth: 1, borderBottomColor: colors.violet,
+    paddingBottom: 2, padding: 0,
+  },
+  saveBtn: {
+    backgroundColor: colors.violet,
+    width: 24, height: 24,
+    borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
+    marginLeft: 6
+  },
   track: { height: 5, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 10, overflow: 'hidden', marginBottom: 4 },
   fill: { height: '100%', borderRadius: 10 },
   pct: { fontSize: 11, color: colors.textFaint },
@@ -64,6 +120,18 @@ export default function Budget() {
   const { transactions, budget, updateBudget } = useFinanceStore();
   const [editing, setEditing] = useState(false);
   const [newLimit, setNewLimit] = useState(budget.totalLimit.toString());
+  const [creatingBudget, setCreatingBudget] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatLimit, setNewCatLimit] = useState('');
+
+  const handleCreateCategoryBudget = () => {
+    if (newCatName.trim() && newCatLimit) {
+      handleUpdateCategoryLimit(newCatName.trim(), parseFloat(newCatLimit) || 0);
+    }
+    setCreatingBudget(false);
+    setNewCatName('');
+    setNewCatLimit('');
+  };
 
   const currentMonthIdx = new Date().getMonth();
   const thisMonthTxs = transactions.filter(t => new Date(t.date).getMonth() === currentMonthIdx);
@@ -71,11 +139,27 @@ export default function Budget() {
   const totalSpent = thisMonthTxs.reduce((s, t) => s + (t.type !== 'Credit' ? t.amount : 0), 0);
   const healthPct = Math.max(0, Math.min(100, 100 - (totalSpent / budget.totalLimit) * 100));
 
-  const categoryTotals: Partial<Record<TransactionCategory, number>> = {};
+  const categoryTotals: Record<string, number> = {};
   thisMonthTxs.forEach(t => {
     if (t.type !== 'Credit')
       categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
   });
+
+  const activeCategories = Array.from(new Set([
+    ...PREDEFINED_CATEGORIES, 
+    ...Object.keys(categoryTotals),
+    ...Object.keys(budget.categoryLimits || {})
+  ]));
+
+  const handleUpdateCategoryLimit = (cat: string, val: number) => {
+    const limits = { ...(budget.categoryLimits || {}) };
+    if (val <= 0) {
+      delete limits[cat];
+    } else {
+      limits[cat] = val;
+    }
+    updateBudget({ ...budget, categoryLimits: limits });
+  };
 
   // Habit streak: consecutive days with at least one transaction (simple)
   const uniqueDays = new Set(transactions.map(t => new Date(t.date).toDateString())).size;
@@ -181,21 +265,50 @@ export default function Budget() {
 
         {/* ── CATEGORY BREAKDOWN ───────────────── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Spending Breakdown</Text>
-          {CATEGORIES.filter(cat => categoryTotals[cat]).length > 0 ? (
-            CATEGORIES.filter(cat => categoryTotals[cat]).map(cat => (
+          <View style={styles.sectionHeadRow}>
+            <Text style={styles.sectionTitle}>Spending Breakdown</Text>
+            <TouchableOpacity onPress={() => setCreatingBudget(!creatingBudget)} style={styles.addBudgetBtn}>
+              <Text style={styles.addBudgetBtnText}>{creatingBudget ? 'Cancel' : '+ Budget'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {creatingBudget && (
+            <View style={styles.createBudgetCard}>
+               <TextInput 
+                 style={styles.createBudgetInput} 
+                 placeholder="Category Name" 
+                 placeholderTextColor={colors.textFaint} 
+                 value={newCatName} 
+                 onChangeText={setNewCatName} 
+               />
+               <TextInput 
+                 style={styles.createBudgetInput} 
+                 placeholder="Limit (₹)" 
+                 placeholderTextColor={colors.textFaint} 
+                 value={newCatLimit} 
+                 onChangeText={setNewCatLimit} 
+                 keyboardType="decimal-pad" 
+               />
+               <TouchableOpacity onPress={handleCreateCategoryBudget} style={styles.createBudgetSave}>
+                 <Text style={{color: '#fff', fontWeight:'700', fontSize: 13}}>Add</Text>
+               </TouchableOpacity>
+            </View>
+          )}
+          {activeCategories.filter(cat => categoryTotals[cat] || (budget.categoryLimits && budget.categoryLimits[cat])).length > 0 ? (
+            activeCategories.filter(cat => categoryTotals[cat] || (budget.categoryLimits && budget.categoryLimits[cat])).map(cat => (
               <CategoryBar
                 key={cat}
                 cat={cat}
                 amount={categoryTotals[cat] || 0}
                 total={totalSpent}
-                limit={budget.categoryLimits[cat] || 0}
+                limit={(budget.categoryLimits && budget.categoryLimits[cat]) || 0}
+                onUpdateLimit={handleUpdateCategoryLimit}
               />
             ))
           ) : (
             <View style={styles.emptyBreakdown}>
               <Text style={styles.emptyBreakdownEmoji}>📊</Text>
-              <Text style={styles.emptyBreakdownText}>No spending data this month</Text>
+              <Text style={styles.emptyBreakdownText}>No active categories available.</Text>
             </View>
           )}
         </View>
@@ -281,7 +394,13 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
 
   section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 20, letterSpacing: -0.3 },
+  sectionHeadRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.text, letterSpacing: -0.3, marginBottom: 0 },
+  addBudgetBtn: { backgroundColor: colors.bgCard, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+  addBudgetBtnText: { color: colors.violet, fontSize: 12, fontWeight: '700' },
+  createBudgetCard: { flexDirection: 'row', gap: 8, marginBottom: 20, backgroundColor: colors.bgCard, padding: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderBright },
+  createBudgetInput: { flex: 1, color: colors.text, fontSize: 13, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 4 },
+  createBudgetSave: { backgroundColor: colors.violet, paddingHorizontal: 16, justifyContent: 'center', alignItems: 'center', borderRadius: radius.sm },
 
   emptyBreakdown: {
     alignItems: 'center',

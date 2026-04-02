@@ -103,6 +103,35 @@ export const CATEGORY_META: Record<string, { emoji: string; color: string; bg: s
   Other:         { emoji: '✨', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)', label: 'Other' },
 };
 
+export const getCategoryMeta = (cat: string) => {
+  if (CATEGORY_META[cat]) return CATEGORY_META[cat];
+  
+  // Consistent color for unknown categories based on string hash
+  let hash = 0;
+  for (let i = 0; i < cat.length; i++) {
+    hash = cat.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  const colorsList = [
+    { color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.15)' },
+    { color: '#0EA5E9', bg: 'rgba(14, 165, 233, 0.15)' },
+    { color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.15)' },
+    { color: '#F43F5E', bg: 'rgba(244, 63, 94, 0.15)' },
+    { color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)' },
+    { color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.15)' },
+    { color: '#EC4899', bg: 'rgba(236, 72, 153, 0.15)' },
+  ];
+  const idx = Math.abs(hash) % colorsList.length;
+  const theme = colorsList[idx];
+
+  return {
+    emoji: '🏷️',
+    color: theme.color,
+    bg: theme.bg,
+    label: cat
+  };
+};
+
 // Legacy exports for unmodified Expo template components
 export const Colors = {
   light: {

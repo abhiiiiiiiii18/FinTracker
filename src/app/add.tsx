@@ -16,7 +16,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { CATEGORY_META, colors, radius, shadow } from "../constants/theme";
+import { CATEGORY_META, getCategoryMeta, colors, radius, shadow } from "../constants/theme";
 import { TransactionCategory, useFinanceStore } from "../store/useFinanceStore";
 
 const CATEGORIES: TransactionCategory[] = [
@@ -33,6 +33,8 @@ export default function AddTransaction() {
 
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<TransactionCategory>("Food");
+  const [customCategory, setCustomCategory] = useState("");
+  const [isCustomCat, setIsCustomCat] = useState(false);
   const [note, setNote] = useState("");
 
   const btnScale = useRef(new Animated.Value(1)).current;
@@ -82,7 +84,7 @@ export default function AddTransaction() {
     ]).start(() => {
       addTransaction({
         amount: value,
-        category,
+        category: isCustomCat && customCategory.trim() ? customCategory.trim() : category,
         note: note.trim(),
         source: "manual",
       });
@@ -90,7 +92,8 @@ export default function AddTransaction() {
     });
   };
 
-  const meta = CATEGORY_META[category];
+  const activeCat = isCustomCat && customCategory.trim() ? customCategory.trim() : category;
+  const meta = getCategoryMeta(activeCat);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -135,12 +138,15 @@ export default function AddTransaction() {
           <Text style={styles.sectionLabel}>CATEGORY</Text>
           <View style={styles.categoryGrid}>
             {CATEGORIES.map((cat) => {
-              const catMeta = CATEGORY_META[cat];
-              const isActive = category === cat;
+              const catMeta = getCategoryMeta(cat);
+              const isActive = !isCustomCat && category === cat;
               return (
                 <TouchableOpacity
                   key={cat}
-                  onPress={() => setCategory(cat)}
+                  onPress={() => {
+                    setIsCustomCat(false);
+                    setCategory(cat);
+                  }}
                   activeOpacity={0.7}
                   style={[
                     styles.categoryCard,
@@ -180,7 +186,61 @@ export default function AddTransaction() {
                 </TouchableOpacity>
               );
             })}
+
+            {/* Custom Category Selection */}
+            <TouchableOpacity
+              onPress={() => setIsCustomCat(true)}
+              activeOpacity={0.7}
+              style={[
+                styles.categoryCard,
+                isCustomCat && {
+                  borderColor: colors.violet,
+                  backgroundColor: colors.violetGlow,
+                },
+              ]}
+            >
+               <View
+                style={[
+                  styles.categoryEmojiBg,
+                  {
+                    backgroundColor: isCustomCat
+                      ? colors.violet + "30"
+                      : colors.bgCardAlt,
+                  },
+                ]}
+              >
+                <Text style={styles.categoryEmoji}>✨</Text>
+              </View>
+              <Text
+                style={[
+                  styles.categoryLabel,
+                  isCustomCat && { color: colors.violet },
+                ]}
+              >
+                Custom
+              </Text>
+              {isCustomCat && (
+                <CheckCircle2
+                  size={14}
+                  color={colors.violet}
+                  style={styles.checkIcon}
+                />
+              )}
+            </TouchableOpacity>
           </View>
+
+          {isCustomCat && (
+             <View style={styles.noteWrapper}>
+                <TextInput
+                  style={[styles.noteInput, { minHeight: 50, marginBottom: 0 }]}
+                  placeholder="Enter custom category name..."
+                  placeholderTextColor={colors.textFaint}
+                  value={customCategory}
+                  onChangeText={setCustomCategory}
+                  maxLength={15}
+                />
+             </View>
+          )}
 
           {/* ── NOTE INPUT ───────────────────────── */}
           <Text style={styles.sectionLabel}>NOTE (OPTIONAL)</Text>
